@@ -2,6 +2,7 @@
 name = "horizonhaptics"
 version = "1.0.0"
 description = "HorizonHaptics - Forza Horizon 6 DualSense adaptive triggers"
+license = { file = "LICENSE" }
 requires-python = ">=3.13"
 dependencies = [
     "hidapi>=0.15.0",
