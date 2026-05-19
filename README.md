@@ -37,8 +37,7 @@ Both scripts install `uv` (the package manager) if it is not already present, th
 2. Set **Data Out IP** to your PC's local IP address  
    *(shown on the Info tab inside HorizonHaptics)*
 3. Set **Data Out Port** to `5300`
-4. **Disable in-game controller vibration and trigger effects.** HorizonHaptics writes its own effects directly to the controller. If the game's native haptics are also active they will conflict, producing jittery output.
-5. Start a race or free roam  -  the status bar will show **FH6: Receiving** when packets arrive
+4. Start a race or free roam  -  the status bar will show **FH6: Receiving** when packets arrive
 
 ---
 
