@@ -492,7 +492,7 @@ def _get_local_ips() -> list[str]:
         s.close()
     except Exception:
         pass
-    ips.discard("127.0.0.1")
+    ips.add("127.0.0.1")
     return sorted(ips)
 
 
