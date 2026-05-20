@@ -109,7 +109,7 @@ class Worker:
                     log.debug("Parse error: %s", exc)
                     continue
 
-                self._ds.steam_rumble = self._state.surface.allow_steam_rumble
+                self._ds.allow_steam_rumble = self._state.surface.allow_steam_rumble
                 pair = self._parser.compute(pkt) if pkt.is_race_on else OFF_PAIR
                 if pair != prev:
                     self._ds.set(*pair)
