@@ -11,9 +11,11 @@ Inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://github.co
 
 ---
 
-## What's Different
+## Features
 
-| Feature | HorizonHaptics |
+> Note: This project was developed independently over the same period. Some of these features may already exist or have since been added to the project that inspired it.
+
+| Feature | Description |
 |---|---|
 | FH6 packet format | Full official spec with direct absolute offsets - no legacy indirection |
 | Trigger modes | Off / Resistance / Vibration selectable per trigger |
