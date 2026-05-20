@@ -5,6 +5,34 @@ Reads the game's UDP telemetry and translates live physics data into trigger res
 
 ---
 
+## Acknowledgements
+
+Inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://github.com/HamzaYslmn/Forza-Horizon-DualSense-Python), which pioneered adaptive trigger support for Forza on PC. HorizonHaptics is a separate implementation with a different architecture and an expanded feature set targeted at Forza Horizon 6.
+
+---
+
+## What's Different
+
+| Feature | HorizonHaptics |
+|---|---|
+| FH6 packet format | Full official spec with direct absolute offsets - no legacy indirection |
+| Trigger modes | Off / Resistance / Vibration selectable per trigger |
+| G-force resistance | R2 strength proportional to lateral and forward G, tunable independently |
+| Wheelspin vibration | Frequency scales with combined slip, amplitude with G-force, EWMA smoothed |
+| Handbrake | Detected from FH6 telemetry - L2 goes rigid while handbrake is active |
+| Boost | Extra R2 resistance when turbo boost is active |
+| ABS simulation | Top N zones stay firm while lower zones pulse at lock-up frequency |
+| Gear shift burst | Vibration burst on gear change, configurable per trigger |
+| Collision jolt | Hard burst on both triggers when SmashableVelDiff spikes |
+| Road surface rumble | Per-wheel SurfaceRumble telemetry drives idle trigger feedback |
+| Rumble strip detection | WheelOnRumbleStrip telemetry fires independently of in-game vibration setting |
+| Steam rumble coexistence | Motor bytes left untouched so FH6 body rumble works alongside trigger effects |
+| Qt desktop GUI | Full settings UI with live tuning, no terminal required |
+| First-run setup | Auto-installs udev rules on Linux, firewall guidance on Windows |
+| Settings | Saved to disk automatically, take effect immediately without restart |
+
+---
+
 ## Requirements
 
 - Forza Horizon 6 (PC)
