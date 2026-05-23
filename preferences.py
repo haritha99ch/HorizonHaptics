@@ -1,4 +1,4 @@
-"""Save / load settings to ~/.config/horizonhaptics/settings.json."""
+"""Save/load settings to ~/.config/horizonhaptics/settings.json. v1.2.2"""
 
 import dataclasses
 import json

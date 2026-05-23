@@ -1,4 +1,4 @@
-"""Auto-update: check GitHub releases, download zip, patch in place, restart."""
+"""Auto-update: check GitHub releases, download zip, patch in place, restart. v1.2.2"""
 
 import json
 import logging

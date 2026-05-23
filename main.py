@@ -1,4 +1,4 @@
-"""HorizonHaptics - entry point.
+"""HorizonHaptics v1.2.2 - entry point.
 
 Usage:
   uv run main.py               # Qt GUI (default)

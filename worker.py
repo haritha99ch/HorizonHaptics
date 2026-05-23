@@ -1,4 +1,4 @@
-"""UDP receive loop + DualSense writer."""
+"""UDP receive loop + DualSense writer. v1.2.2"""
 
 import logging
 import socket
