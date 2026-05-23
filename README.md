@@ -7,9 +7,9 @@ Reads the game's UDP telemetry and translates live physics data into trigger res
 
 ## Acknowledgements
 
-Inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://github.com/HamzaYslmn/Forza-Horizon-DualSense-Python), which pioneered adaptive trigger support for Forza on PC. HorizonHaptics is a separate implementation with a different architecture and an expanded feature set targeted at Forza Horizon 6.
+Inspired by [cosmii02's RacingDSX](https://github.com/cosmii02/RacingDSX), which made me realise that DualSense adaptive trigger support was possible in Forza Horizon 5.
 
-If you find his project useful, consider supporting his work at https://github.com/sponsors/HamzaYslmn
+Also inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://github.com/HamzaYslmn/Forza-Horizon-DualSense-Python), which pioneered adaptive trigger support for Forza on PC. HorizonHaptics is a separate implementation with a different architecture and an expanded feature set targeted at Forza Horizon 6.
 
 ---
 
