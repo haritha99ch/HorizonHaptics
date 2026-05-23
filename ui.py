@@ -9,6 +9,7 @@ import logging
 import queue
 import socket
 import sys
+import threading
 from functools import partial
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -35,7 +36,9 @@ from PySide6.QtWidgets import (
 )
 
 import preferences
+import updater
 from Config import BrakeSettings, GearSettings, SurfaceSettings, ThrottleSettings, TriggerMode
+from version import __version__
 from worker import State, Worker
 
 log = logging.getLogger("hh")
@@ -124,6 +127,7 @@ _MODE_LABELS = [m.name.capitalize() for m in TriggerMode]  # Off, Resistance, Vi
 # Thread-safe log queue
 
 _log_q: queue.SimpleQueue = queue.SimpleQueue()
+_update_q: queue.SimpleQueue = queue.SimpleQueue()
 
 
 class _QtLogHandler(logging.Handler):
@@ -545,6 +549,21 @@ class InfoPage(QWidget):
         status_form.addRow("Packets received:", self._pkt_val)
         layout.addWidget(status_box)
 
+        # Update panel - hidden until an update is found
+        self._update_box = QGroupBox("Update Available")
+        update_vbox = QVBoxLayout(self._update_box)
+        self._update_label = QLabel()
+        self._update_btn = QPushButton("Download")
+        self._update_btn.setFixedHeight(32)
+        self._update_btn.clicked.connect(self._on_update_btn)
+        update_vbox.addWidget(self._update_label)
+        update_vbox.addWidget(self._update_btn)
+        self._update_box.hide()
+        layout.addWidget(self._update_box)
+        self._update_url = ""
+        self._update_tag = ""
+        self._update_zip = None
+
         layout.addStretch()
 
     def refresh(self):
@@ -557,6 +576,47 @@ class InfoPage(QWidget):
         self._fh6_val.setText("Receiving" if recv else "Waiting")
         self._src_val.setText(addr or "-")
         self._pkt_val.setText(str(pkts))
+
+    def notify_update(self, tag: str, url: str):
+        self._update_tag = tag
+        self._update_url = url
+        self._update_label.setText(f"Version {tag} is available")
+        self._update_btn.setText("Download")
+        self._update_btn.setEnabled(True)
+        self._update_box.show()
+
+    def _on_update_btn(self):
+        if self._update_zip:
+            updater.apply_and_restart(self._update_zip)
+            QApplication.quit()
+            return
+        self._update_btn.setEnabled(False)
+        self._update_label.setText(f"Downloading {self._update_tag}...")
+
+        def _progress(pct):
+            _update_q.put(("progress", pct))
+
+        def _download():
+            zip_path = updater.download_update(self._update_url, self._update_tag, _progress)
+            if zip_path:
+                _update_q.put(("ready", zip_path))
+            else:
+                _update_q.put(("error",))
+
+        threading.Thread(target=_download, daemon=True, name="hh-download").start()
+
+    def handle_update_msg(self, msg):
+        kind = msg[0]
+        if kind == "progress":
+            self._update_label.setText(f"Downloading {self._update_tag}... {msg[1]:.0f}%")
+        elif kind == "ready":
+            self._update_zip = msg[1]
+            self._update_label.setText(f"{self._update_tag} ready - click to restart")
+            self._update_btn.setText("Restart to Apply")
+            self._update_btn.setEnabled(True)
+        elif kind == "error":
+            self._update_label.setText("Download failed - try again")
+            self._update_btn.setEnabled(True)
 
 
 # Main window
@@ -608,6 +668,8 @@ class MainWindow(QMainWindow):
         t_log.timeout.connect(self._poll_logs)
         t_log.start(100)
 
+        updater.start_check(lambda tag, url: _update_q.put(("available", tag, url)))
+
     def _update_status(self):
         with self._state.lock:
             ds_ok = self._state.ds_connected
@@ -621,6 +683,16 @@ class MainWindow(QMainWindow):
             f"FH6: * Receiving  {addr}" if recv else "FH6: - Waiting for packets"
         )
         self._info_page.refresh()
+
+        try:
+            while True:
+                msg = _update_q.get_nowait()
+                if msg[0] == "available":
+                    self._info_page.notify_update(msg[1], msg[2])
+                else:
+                    self._info_page.handle_update_msg(msg)
+        except queue.Empty:
+            pass
 
     def _poll_logs(self):
         try:
