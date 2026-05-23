@@ -9,7 +9,7 @@ class SurfaceSettings:
 
     # Road surface rumble (SurfaceRumble* fields, active on idle trigger)
     freq: int = 10
-    amp: int = 80
+    amp: int = 10
 
     # Rumble strip (WheelOnRumbleStrip* fields)
     strip_freq: int = 25

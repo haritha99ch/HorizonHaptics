@@ -4,7 +4,7 @@ from .trigger_mode import TriggerMode
 
 @dataclass
 class BrakeSettings:
-    mode: TriggerMode = TriggerMode.VIBRATION
+    mode: TriggerMode = TriggerMode.RESISTANCE
     intensity: float = 0.7
     grip_loss_value: float = 0.05
 

@@ -179,7 +179,7 @@ All settings take effect immediately and are saved automatically to
 #### General
 | Setting | Default | Description |
 |---|---|---|
-| **Mode** | Vibration | Off / Resistance / Vibration |
+| **Mode** | Resistance | Off / Resistance / Vibration |
 | **Intensity** | `0.7` | Global output multiplier for all L2 effects. |
 | **Grip loss threshold** | `0.05` | Slip value at which ABS/lock-up vibration activates. Very sensitive by default. |
 
@@ -238,7 +238,7 @@ Light continuous vibration on the idle trigger driven by the game's per-wheel su
 | Setting | Default | Description |
 |---|---|---|
 | **Frequency** | `10` | Vibration frequency for normal road texture. |
-| **Amplitude** | `80` | Vibration strength for normal road texture. |
+| **Amplitude** | `10` | Vibration strength for normal road texture. |
 
 #### Rumble Strip
 Stronger vibration when any wheel crosses a rumble strip.
