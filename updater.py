@@ -29,13 +29,7 @@ time.sleep(3)
 
 with zipfile.ZipFile(zip_path) as zf:
     for member in zf.namelist():
-        parts = Path(member).parts
-        if len(parts) > 1:
-            rel = Path(*parts[1:])
-        elif len(parts) == 1 and not member.endswith("/"):
-            rel = Path(parts[0])
-        else:
-            continue
+        rel = Path(member)
         if not rel.parts or str(rel).startswith(".venv"):
             continue
         dest = app_dir / rel
