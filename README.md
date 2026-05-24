@@ -56,6 +56,8 @@ Also inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://gith
   *(DualSense Edge support is untested  -  same HID protocol, should work)*
 - Python 3.13+ - managed automatically by the launcher scripts
 
+> **Microsoft Store version:** The Microsoft Store edition of FH6 does not natively support DualSense Adaptive Triggers as it lacks Steam Input integration. To enable support, configure DS4Windows so the controller is recognised by the game, then follow the UDP setup steps in this guide. Thanks to [u/Ok-Zookeepergame1969](https://www.reddit.com/user/Ok-Zookeepergame1969/) for confirming this workaround.
+
 ---
 
 ## Quick Start
