@@ -29,8 +29,8 @@ _PIDS = (0x0CE6, 0x0DF2)  # DualSense, DualSense Edge
 _NAMES = {0x0CE6: "DualSense", 0x0DF2: "DualSense Edge"}
 
 # HID output report layout (byte offsets) per transport
-_USB = {"id": 0x02, "flags": 1, "vf1": 2, "psav": 10, "r": 11, "l": 22, "size": 64, "bt": False}
-_BT  = {"id": 0x31, "flags": 2, "vf1": 3, "psav": 11, "r": 12, "l": 23, "size": 78, "bt": True}
+_USB = {"id": 0x02, "flags": 1, "vf1": 2, "motor_r": 3, "motor_l": 4, "psav": 10, "r": 11, "l": 22, "vf2": 39, "lb_setup": 42, "player_leds": 44, "lb_r": 45, "lb_g": 46, "lb_b": 47, "size": 64, "bt": False}
+_BT  = {"id": 0x31, "flags": 2, "vf1": 3, "motor_r": 4, "motor_l": 5, "psav": 11, "r": 12, "l": 23, "vf2": 40, "lb_setup": 43, "player_leds": 45, "lb_r": 46, "lb_g": 47, "lb_b": 48, "size": 78, "bt": True}
 
 # valid_flag0 bit masks
 _FL_MOTORS   = 0x03  # right motor (bit 0) + left motor (bit 1)
@@ -81,6 +81,9 @@ class DualSense:
         self._layout = _USB
         self._lock = threading.Lock()
         self._pending = (off(), off())
+        self._pending_lb = (0, 0, 0)
+        self._pending_motors = (0, 0)
+        self._pending_player_leds = 0
         self._dirty = False
         self._running = False
         self._thread = None
@@ -104,10 +107,13 @@ class DualSense:
             self._thread.join(timeout=2.0)
         self._release()
 
-    def set(self, left, right):
-        """Queue a new (L2, R2) effect pair."""
+    def set(self, left, right, lb_r=0, lb_g=0, lb_b=0, motor_l=0, motor_r=0, player_leds=0):
+        """Queue a new (L2, R2) effect pair, lightbar color, motor rumble, and player LEDs."""
         with self._lock:
             self._pending = (left, right)
+            self._pending_lb = (lb_r, lb_g, lb_b)
+            self._pending_motors = (motor_l, motor_r)
+            self._pending_player_leds = player_leds
             self._dirty = True
 
     def _connect(self):
@@ -150,7 +156,7 @@ class DualSense:
     def _release(self):
         if self._dev:
             try:
-                self._dev.write(self._build(off(), off()))
+                self._dev.write(self._build(off(), off(), 0, 0, 0, 0, 0, 0))
             except Exception:
                 pass
             try:
@@ -165,9 +171,9 @@ class DualSense:
     def _startup_pulse(self):
         """Brief resistance bump on connect so the user knows the controller is live."""
         try:
-            self._dev.write(self._build(rigid(180), rigid(180)))
+            self._dev.write(self._build(rigid(180), rigid(180), 0, 0, 0, 0, 0, 0))
             time.sleep(0.18)
-            self._dev.write(self._build(off(), off()))
+            self._dev.write(self._build(off(), off(), 0, 0, 0, 0, 0, 0))
         except Exception:
             pass
 
@@ -199,21 +205,44 @@ class DualSense:
                         time.sleep(0.001)
                         continue
                     left, right = self._pending
+                    lb_r, lb_g, lb_b = self._pending_lb
+                    motor_l, motor_r = self._pending_motors
+                    player_leds = self._pending_player_leds
                     self._dirty = False
-                self._dev.write(self._build(left, right))
+                self._dev.write(self._build(left, right, lb_r, lb_g, lb_b, motor_l, motor_r, player_leds))
             except Exception as exc:
                 log.warning("HID write failed (%s) - reconnecting", exc)
                 self._release()
 
-    def _build(self, left, right):
-        """Assemble a HID output report for the given L2/R2 effect pair."""
+    def _build(self, left, right, lb_r, lb_g, lb_b, motor_l, motor_r, player_leds):
+        """Assemble a HID output report for the given L2/R2 effect pair and lightbar/motors."""
         L = self._layout
         buf = bytearray(L["size"])
         buf[0] = L["id"]
         if L["bt"]:
             buf[1] = 0x02
-        # Claim trigger bytes; only claim motor bytes when zeroing them out
-        buf[L["flags"]] = _FL_TRIGGERS | (0 if self.allow_steam_rumble else _FL_MOTORS)
+        # Claim trigger bytes; only claim motor bytes when zeroing them out or controlling them
+        flags = _FL_TRIGGERS
+        if not self.allow_steam_rumble:
+            flags |= 0x20  # HAPTICS_SELECT (enable audio haptics instead of legacy motors)
+            buf[L["motor_r"]] = 0
+            buf[L["motor_l"]] = 0
+        buf[L["flags"]] = flags
+        
+        # Lightbar and Player LEDs setup
+        vf1 = 0x04 | 0x10  # LIGHTBAR | PLAYER_INDICATOR
+        if not self.allow_steam_rumble:
+            vf1 |= 0x20  # HAPTICS_CONTROL_ENABLE
+        buf[L["vf1"]] = vf1
+        buf[L["vf2"]] = 0x02  # LIGHTBAR_SETUP_CONTROL_ENABLE
+        buf[L["lb_setup"]] = 0x02  # LIGHTBAR_SETUP_LIGHT_OUT
+        buf[L["lb_r"]] = lb_r
+        buf[L["lb_g"]] = lb_g
+        buf[L["lb_b"]] = lb_b
+        
+        # Player LEDs (0-0x1F mask, plus 0x20 for direct brightness control)
+        buf[L["player_leds"]] = player_leds | 0x20
+
         for offset, (mode, params) in ((L["r"], right), (L["l"], left)):
             buf[offset] = mode
             for i, b in enumerate(params[:10]):

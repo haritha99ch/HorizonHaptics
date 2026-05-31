@@ -8,9 +8,10 @@ from dataclasses import dataclass, field
 
 from dualsense.main import DualSense
 from dualsense.triggers import off
+from dualsense.audio import AudioHaptics
 from GameParsers.forza_parser import DataPacket, FH6_PACKET_SIZE, parse
 from GameParsers.parser import Parser
-from Config import BrakeSettings, GearSettings, SurfaceSettings, ThrottleSettings
+from Config import BrakeSettings, GearSettings, SurfaceSettings, ThrottleSettings, TachometerSettings
 
 log = logging.getLogger("hh.worker")
 
@@ -35,12 +36,14 @@ class State:
     brake: BrakeSettings = field(default_factory=BrakeSettings)
     gear: GearSettings = field(default_factory=GearSettings)
     surface: SurfaceSettings = field(default_factory=SurfaceSettings)
+    tachometer: TachometerSettings = field(default_factory=TachometerSettings)
 
     # Status (read under .lock)
     ds_connected: bool = False
     receiving: bool = False
     last_addr: str = ""
     pkt_count: int = 0
+    running: bool = True
 
 
 class Worker:
@@ -57,21 +60,25 @@ class Worker:
         self._state = state
         self._port = port
         self._ds = DualSense()
+        self._audio = AudioHaptics()
         # Parser keeps references - not copies - so TUI changes propagate live
-        self._parser = Parser(state.throttle, state.brake, state.gear, state.surface)
+        self._parser = Parser(state.throttle, state.brake, state.gear, state.surface, state.tachometer)
         self._thread = threading.Thread(target=self._run, daemon=True, name="hh-worker")
 
     def start(self):
         self._ds.open()
+        self._audio.start()
         self._thread.start()
         log.info("Worker started - UDP %s:%d", UDP_HOST, self._port)
 
     def stop(self):
-        self._ds.set(_OFF, _OFF)
+        self._state.running = False
+        self._ds.set(_OFF, _OFF, 0, 0, 0)
         self._ds.close()
+        self._audio.stop()
 
     def _run(self):
-        OFF_PAIR = _OFF, _OFF
+        OFF_PAIR = _OFF, _OFF, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         prev = None
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -83,9 +90,13 @@ class Worker:
         last_pkt = time.monotonic()
 
         try:
-            while True:
+            while self._state.running:
                 with self._state.lock:
-                    self._state.ds_connected = self._ds.connected
+                    if self._ds.connected:
+                        self._ds.allow_steam_rumble = self._state.surface.allow_steam_rumble and not self._state.surface.enable_body_haptics
+                        self._state.ds_connected = True
+                    else:
+                        self._state.ds_connected = False
 
                 try:
                     data, addr = sock.recvfrom(512)
@@ -94,7 +105,8 @@ class Worker:
                         with self._state.lock:
                             self._state.receiving = False
                     if prev != OFF_PAIR:
-                        self._ds.set(*OFF_PAIR)
+                        self._ds.set(*OFF_PAIR[:8])
+                        self._audio.set_haptics(*OFF_PAIR[8:])
                         prev = OFF_PAIR
                     continue
 
@@ -110,10 +122,11 @@ class Worker:
                     continue
 
                 self._ds.allow_steam_rumble = self._state.surface.allow_steam_rumble
-                pair = self._parser.compute(pkt) if pkt.is_race_on else OFF_PAIR
-                if pair != prev:
-                    self._ds.set(*pair)
-                    prev = pair
+                data_out = self._parser.compute(pkt)
+                if data_out != prev:
+                    self._ds.set(*data_out[:8])
+                    self._audio.set_haptics(*data_out[8:])
+                    prev = data_out
 
                 with self._state.lock:
                     self._state.receiving = True

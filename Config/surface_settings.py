@@ -22,7 +22,16 @@ class SurfaceSettings:
 
     # Collision jolt (SmashableVelDiff spike)
     enable_collision: bool = True
-    collision_threshold: float = 5.0  # m/s velocity change to arm
+    collision_threshold: float = 3.0  # m/s vel diff
     collision_freq: int = 40
     collision_amp: int = 255
-    collision_duration_ms: float = 200.0
+    collision_duration_ms: float = 150.0
+
+    enable_body_haptics: bool = False
+    haptic_intensity: float = 1.0
+    engine_haptics_volume: float = 1.0
+    collision_haptics_volume: float = 1.0
+
+    enable_slip_haptics: bool = True
+    slip_threshold: float = 0.8
+    slip_intensity: float = 1.0

@@ -26,6 +26,7 @@ class DataPacket:
     tire_combined_slip_rr: float = 0.0
 
     current_engine_rpm: float = 0.0
+    engine_idle_rpm: float = 0.0
     engine_max_rpm: float = 0.0
 
     speed: float = 0.0  # m/s
@@ -45,11 +46,23 @@ class DataPacket:
     surface_rumble_rl: float = 0.0
     surface_rumble_rr: float = 0.0
 
+    # Suspension travel (meters), FH6 @68-80
+    suspension_travel_fl: float = 0.0
+    suspension_travel_fr: float = 0.0
+    suspension_travel_rl: float = 0.0
+    suspension_travel_rr: float = 0.0
+
     # Rumble strip detection (S32, non-zero = on strip), FH6 @116-128
     wheel_on_rumble_strip_fl: int = 0
     wheel_on_rumble_strip_fr: int = 0
     wheel_on_rumble_strip_rl: int = 0
     wheel_on_rumble_strip_rr: int = 0
+
+    # Puddle depth (meters), FH6 @132-144
+    wheel_in_puddle_depth_fl: float = 0.0
+    wheel_in_puddle_depth_fr: float = 0.0
+    wheel_in_puddle_depth_rl: float = 0.0
+    wheel_in_puddle_depth_rr: float = 0.0
 
     # Collision velocity delta (m/s), FH6-exclusive @236
     smashable_vel_diff: float = 0.0
@@ -102,6 +115,7 @@ def parse(data: bytes) -> DataPacket:
         tire_combined_slip_rl=f(188),
         tire_combined_slip_rr=f(192),
         current_engine_rpm=f(16),
+        engine_idle_rpm=f(12),
         engine_max_rpm=f(8),
         speed=f(256),
         speed_kmh=f(256) * 3.6,
@@ -115,10 +129,18 @@ def parse(data: bytes) -> DataPacket:
         surface_rumble_fr=srf_fr,
         surface_rumble_rl=srf_rl,
         surface_rumble_rr=srf_rr,
+        suspension_travel_fl=f(68),
+        suspension_travel_fr=f(72),
+        suspension_travel_rl=f(76),
+        suspension_travel_rr=f(80),
         wheel_on_rumble_strip_fl=rs_fl,
         wheel_on_rumble_strip_fr=rs_fr,
         wheel_on_rumble_strip_rl=rs_rl,
         wheel_on_rumble_strip_rr=rs_rr,
+        wheel_in_puddle_depth_fl=f(132),
+        wheel_in_puddle_depth_fr=f(136),
+        wheel_in_puddle_depth_rl=f(140),
+        wheel_in_puddle_depth_rr=f(144),
         smashable_vel_diff=f(236),
         four_wheel_slip=(fl + fr + rl + rr) / 4.0,
         front_slip=(fl + fr) / 2.0,

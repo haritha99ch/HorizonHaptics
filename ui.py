@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 
 import preferences
 import updater
-from Config import BrakeSettings, GearSettings, SurfaceSettings, ThrottleSettings, TriggerMode
+from Config import BrakeSettings, GearSettings, SurfaceSettings, ThrottleSettings, TachometerSettings, TriggerMode
 from version import __version__
 from worker import State, Worker
 
@@ -222,7 +222,7 @@ class SettingsPage(QScrollArea):
 
     def _on_mode_changed(self, index: int):
         self._settings.mode = TriggerMode(index)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("%s mode -> %s", self._prefix.upper(), self._settings.mode.name)
 
     def _on_changed(self, attr: str, spin):
@@ -230,7 +230,7 @@ class SettingsPage(QScrollArea):
         if new == getattr(self._settings, attr):
             return
         setattr(self._settings, attr, new)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("%s.%s = %s", self._prefix.upper(), attr, new)
 
     def _on_reset(self):
@@ -245,7 +245,7 @@ class SettingsPage(QScrollArea):
             spin.blockSignals(True)
             spin.setValue(getattr(self._settings, attr))
             spin.blockSignals(False)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("%s settings reset to defaults.", self._prefix.upper())
 
 
@@ -312,7 +312,7 @@ class GearSettingsPage(QScrollArea):
 
     def _on_bool(self, attr: str, value: bool):
         setattr(self._settings, attr, value)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("GEAR.%s = %s", attr, value)
 
     def _on_changed(self, attr: str, spin):
@@ -320,7 +320,7 @@ class GearSettingsPage(QScrollArea):
         if new == getattr(self._settings, attr):
             return
         setattr(self._settings, attr, new)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("GEAR.%s = %s", attr, new)
 
     def _on_reset(self):
@@ -337,7 +337,7 @@ class GearSettingsPage(QScrollArea):
             spin.blockSignals(True)
             spin.setValue(getattr(self._settings, attr))
             spin.blockSignals(False)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("GEAR settings reset to defaults.")
 
 
@@ -381,12 +381,21 @@ class SurfaceSettingsPage(QScrollArea):
         self._chk_collision.toggled.connect(lambda v: self._on_bool("enable_collision", v))
         enable_form.addRow("Collision jolt", self._chk_collision)
 
+        self._chk_body_haptics = QCheckBox()
+        self._chk_body_haptics.setChecked(settings.enable_body_haptics)
+        self._chk_body_haptics.toggled.connect(self._on_body_haptics_toggled)
+        enable_form.addRow("Enable Body Haptics (Left/Right Motors)", self._chk_body_haptics)
+
         self._chk_steam_rumble = QCheckBox()
         self._chk_steam_rumble.setChecked(settings.allow_steam_rumble)
         self._chk_steam_rumble.toggled.connect(lambda v: self._on_bool("allow_steam_rumble", v))
+        self._steam_rumble_row = enable_form.rowCount()
         enable_form.addRow("Allow Steam rumble (L/R motors)", self._chk_steam_rumble)
+        self._steam_rumble_desc_row = enable_form.rowCount()
         enable_form.addRow("", QLabel("Steam Input also sends rumble through these motors.\n"
-                                      "Disable to suppress it."))
+                                      "Disable to suppress it. (Disabled automatically if Body Haptics is on)"))
+        
+        self._update_steam_rumble_ui()
 
         root.addWidget(enable_box)
 
@@ -405,6 +414,54 @@ class SurfaceSettingsPage(QScrollArea):
                 form.addRow(label, spin)
             root.addWidget(group)
 
+        # Body Haptics Tuning
+        haptics_group = QGroupBox("Body Haptics Tuning")
+        haptics_form = QFormLayout(haptics_group)
+        haptics_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        haptics_form.setHorizontalSpacing(16)
+        haptics_form.setVerticalSpacing(6)
+        
+        spin_haptic = SettingsPage._make_spin(settings.haptic_intensity, 0.0, 5.0)
+        spin_haptic.editingFinished.connect(partial(self._on_changed, "haptic_intensity", spin_haptic))
+        self._spins["haptic_intensity"] = spin_haptic
+        haptics_form.addRow("Haptic Intensity", spin_haptic)
+        
+        spin_engine = SettingsPage._make_spin(settings.engine_haptics_volume, 0.0, 5.0)
+        spin_engine.editingFinished.connect(partial(self._on_changed, "engine_haptics_volume", spin_engine))
+        self._spins["engine_haptics_volume"] = spin_engine
+        haptics_form.addRow("Engine Volume", spin_engine)
+        
+        spin_col = SettingsPage._make_spin(settings.collision_haptics_volume, 0.0, 5.0)
+        spin_col.editingFinished.connect(partial(self._on_changed, "collision_haptics_volume", spin_col))
+        self._spins["collision_haptics_volume"] = spin_col
+        haptics_form.addRow("Collision Volume", spin_col)
+        
+        root.addWidget(haptics_group)
+
+        # Tire Slip & Grip Loss
+        slip_group = QGroupBox("Tire Slip & Grip Loss (Body Motors)")
+        slip_form = QFormLayout(slip_group)
+        slip_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        slip_form.setHorizontalSpacing(16)
+        slip_form.setVerticalSpacing(6)
+        
+        self._chk_slip = QCheckBox()
+        self._chk_slip.setChecked(settings.enable_slip_haptics)
+        self._chk_slip.toggled.connect(lambda v: self._on_bool("enable_slip_haptics", v))
+        slip_form.addRow("Enable Slip Vibration", self._chk_slip)
+        
+        spin_slip_t = SettingsPage._make_spin(settings.slip_threshold, 0.0, 5.0)
+        spin_slip_t.editingFinished.connect(partial(self._on_changed, "slip_threshold", spin_slip_t))
+        self._spins["slip_threshold"] = spin_slip_t
+        slip_form.addRow("Slip Threshold", spin_slip_t)
+
+        spin_slip_i = SettingsPage._make_spin(settings.slip_intensity, 0.0, 5.0)
+        spin_slip_i.editingFinished.connect(partial(self._on_changed, "slip_intensity", spin_slip_i))
+        self._spins["slip_intensity"] = spin_slip_i
+        slip_form.addRow("Slip Intensity", spin_slip_i)
+
+        root.addWidget(slip_group)
+
         # Reset
         reset_btn = QPushButton("Reset to Defaults")
         reset_btn.setFixedHeight(32)
@@ -414,9 +471,20 @@ class SurfaceSettingsPage(QScrollArea):
 
         self.setWidget(container)
 
+    def _update_steam_rumble_ui(self):
+        if self._settings.enable_body_haptics:
+            self._chk_steam_rumble.setChecked(False)
+            self._chk_steam_rumble.setEnabled(False)
+        else:
+            self._chk_steam_rumble.setEnabled(True)
+
+    def _on_body_haptics_toggled(self, value: bool):
+        self._on_bool("enable_body_haptics", value)
+        self._update_steam_rumble_ui()
+
     def _on_bool(self, attr: str, value: bool):
         setattr(self._settings, attr, value)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("SURFACE.%s = %s", attr, value)
 
     def _on_changed(self, attr: str, spin):
@@ -424,7 +492,7 @@ class SurfaceSettingsPage(QScrollArea):
         if new == getattr(self._settings, attr):
             return
         setattr(self._settings, attr, new)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("SURFACE.%s = %s", attr, new)
 
     def _on_reset(self):
@@ -440,15 +508,119 @@ class SurfaceSettingsPage(QScrollArea):
         self._chk_collision.blockSignals(True)
         self._chk_collision.setChecked(self._settings.enable_collision)
         self._chk_collision.blockSignals(False)
+        self._chk_body_haptics.blockSignals(True)
+        self._chk_body_haptics.setChecked(self._settings.enable_body_haptics)
+        self._chk_body_haptics.blockSignals(False)
+        self._chk_slip.blockSignals(True)
+        self._chk_slip.setChecked(self._settings.enable_slip_haptics)
+        self._chk_slip.blockSignals(False)
         self._chk_steam_rumble.blockSignals(True)
         self._chk_steam_rumble.setChecked(self._settings.allow_steam_rumble)
         self._chk_steam_rumble.blockSignals(False)
+        
+        self._update_steam_rumble_ui()
         for attr, spin in self._spins.items():
             spin.blockSignals(True)
             spin.setValue(getattr(self._settings, attr))
             spin.blockSignals(False)
-        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
         log.info("SURFACE settings reset to defaults.")
+
+
+# Tachometer settings page
+
+class TachometerSettingsPage(QScrollArea):
+    """Tachometer lightbar settings."""
+
+    def __init__(self, settings: TachometerSettings, state: State):
+        super().__init__()
+        self._settings = settings
+        self._state = state
+        self._spins: dict = {}
+
+        self.setWidgetResizable(True)
+        self.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        container = QWidget()
+        root = QVBoxLayout(container)
+        root.setSpacing(10)
+        root.setContentsMargins(12, 12, 12, 12)
+
+        # Enable toggles
+        enable_box = QGroupBox("Enable")
+        enable_form = QFormLayout(enable_box)
+        enable_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        enable_form.setHorizontalSpacing(16)
+
+        self._chk_enable = QCheckBox()
+        self._chk_enable.setChecked(settings.enable)
+        self._chk_enable.toggled.connect(lambda v: self._on_bool("enable", v))
+        enable_form.addRow("Enable Tachometer Lightbar", self._chk_enable)
+
+        root.addWidget(enable_box)
+
+        # Tuning sections
+        group = QGroupBox("Tuning")
+        form = QFormLayout(group)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setHorizontalSpacing(16)
+        form.setVerticalSpacing(6)
+        
+        spin_start = SettingsPage._make_spin(settings.start_percent, 0.0, 0.99)
+        spin_start.editingFinished.connect(partial(self._on_changed, "start_percent", spin_start))
+        self._spins["start_percent"] = spin_start
+        form.addRow("Start RPM %  (0.0 - 0.99)", spin_start)
+
+        spin_flash = SettingsPage._make_spin(settings.flash_percent, 0.0, 1.0)
+        spin_flash.editingFinished.connect(partial(self._on_changed, "flash_percent", spin_flash))
+        self._spins["flash_percent"] = spin_flash
+        form.addRow("Flash RPM %  (0.0 - 1.0)", spin_flash)
+
+        spin_rate = SettingsPage._make_spin(settings.flash_rate_hz, 0.0, 50.0)
+        spin_rate.editingFinished.connect(partial(self._on_changed, "flash_rate_hz", spin_rate))
+        self._spins["flash_rate_hz"] = spin_rate
+        form.addRow("Flash Rate Hz", spin_rate)
+        
+        root.addWidget(group)
+
+        # Reset
+        reset_btn = QPushButton("Reset to Defaults")
+        reset_btn.setFixedHeight(32)
+        reset_btn.clicked.connect(self._on_reset)
+        root.addWidget(reset_btn)
+        root.addStretch()
+
+        self.setWidget(container)
+
+    def _on_bool(self, attr: str, value: bool):
+        setattr(self._settings, attr, value)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
+        log.info("TACHOMETER.%s = %s", attr, value)
+
+    def _on_changed(self, attr: str, spin):
+        new = int(spin.value()) if isinstance(spin, QSpinBox) else spin.value()
+        if new == getattr(self._settings, attr):
+            return
+        setattr(self._settings, attr, new)
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
+        log.info("TACHOMETER.%s = %s", attr, new)
+
+    def _on_reset(self):
+        defaults = TachometerSettings()
+        for f in dataclasses.fields(defaults):
+            setattr(self._settings, f.name, getattr(defaults, f.name))
+        
+        self._chk_enable.blockSignals(True)
+        self._chk_enable.setChecked(self._settings.enable)
+        self._chk_enable.blockSignals(False)
+        
+        for attr, spin in self._spins.items():
+            spin.blockSignals(True)
+            spin.setValue(getattr(self._settings, attr))
+            spin.blockSignals(False)
+            
+        preferences.save(self._state.throttle, self._state.brake, self._state.gear, self._state.surface, self._state.tachometer)
+        log.info("TACHOMETER settings reset to defaults.")
 
 
 # Log page
@@ -646,6 +818,7 @@ class MainWindow(QMainWindow):
         )
         tabs.addTab(GearSettingsPage(state.gear, state), "Gear Shift")
         tabs.addTab(SurfaceSettingsPage(state.surface, state), "Surface & Effects")
+        tabs.addTab(TachometerSettingsPage(state.tachometer, state), "Tachometer")
         tabs.addTab(self._log_page, "Logs")
         self.setCentralWidget(tabs)
 
