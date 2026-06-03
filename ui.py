@@ -385,6 +385,7 @@ class SurfaceSettingsPage(QScrollArea):
         self._chk_body_haptics.setChecked(settings.enable_body_haptics)
         self._chk_body_haptics.toggled.connect(self._on_body_haptics_toggled)
         enable_form.addRow("Enable Body Haptics (Left/Right Motors)", self._chk_body_haptics)
+        enable_form.addRow("", QLabel("USB connection only - not supported over Bluetooth."))
 
         self._chk_steam_rumble = QCheckBox()
         self._chk_steam_rumble.setChecked(settings.allow_steam_rumble)

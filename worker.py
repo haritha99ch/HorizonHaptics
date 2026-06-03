@@ -73,7 +73,7 @@ class Worker:
 
     def stop(self):
         self._state.running = False
-        self._ds.set(_OFF, _OFF, 0, 0, 0)
+        self._ds.set(_OFF, _OFF, 0, 0, 0, 0, 0, 0)
         self._ds.close()
         self._audio.stop()
 
@@ -121,7 +121,6 @@ class Worker:
                     log.debug("Parse error: %s", exc)
                     continue
 
-                self._ds.allow_steam_rumble = self._state.surface.allow_steam_rumble
                 data_out = self._parser.compute(pkt)
                 if data_out != prev:
                     self._ds.set(*data_out[:8])

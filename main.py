@@ -22,7 +22,7 @@ log = logging.getLogger("hh")
 
 def _make_state() -> State:
     state = State()
-    preferences.load(state.throttle, state.brake, state.gear, state.surface)
+    preferences.load(state.throttle, state.brake, state.gear, state.surface, state.tachometer)
     return state
 
 

@@ -25,6 +25,10 @@ Also inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://gith
 | Road surface rumble | Per-wheel SurfaceRumble telemetry drives idle trigger feedback |
 | Rumble strip detection | WheelOnRumbleStrip telemetry fires independently of in-game vibration setting |
 | Boost | Extra R2 resistance when turbo boost telemetry is active |
+| Body haptics | Audio-streamed haptics to DualSense actuators - directional collisions, suspension thuds, surface texture, puddle splash, tire slip, ABS pulse, engine rumble |
+| Tachometer lightbar | Lightbar color shifts green to red as RPM rises, flashes red at redline |
+| Gear LEDs | Player LEDs show current gear (1-5+) |
+| Puddle detection | Per-wheel puddle depth drives body haptic drag and splash texture |
 
 **Original implementations:**
 
@@ -37,6 +41,7 @@ Also inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://gith
 | Qt desktop GUI | Full settings UI with live tuning, no terminal required |
 | First-run setup | Auto-installs udev rules on Linux, firewall guidance on Windows |
 | Settings | Saved to disk automatically, take effect immediately without restart |
+| Auto-updater | Checks GitHub releases on startup and patches in place without reinstalling |
 
 **Shared concepts (independent implementations):**
 
@@ -83,7 +88,8 @@ Both scripts install `uv` (the package manager) if it is not already present, th
 2. Set **Data Out IP** to your PC's local IP address  
    *(shown on the Info tab inside HorizonHaptics)*
 3. Set **Data Out Port** to `5300`
-4. Start a race or free roam  -  the status bar will show **FH6: Receiving** when packets arrive
+4. **Disable in-game controller vibration and trigger effects.** HorizonHaptics writes its own effects directly to the controller. If the game's native haptics are also active they will conflict.
+5. Start a race or free roam  -  the status bar will show **FH6: Receiving** when packets arrive
 
 ---
 
@@ -255,10 +261,36 @@ A sharp burst on both triggers when the car takes a hard impact.
 
 | Setting | Default | Description |
 |---|---|---|
-| **Vel diff threshold (m/s)** | `5.0` | Minimum velocity change in a single frame to arm the jolt. Increase to ignore light taps. |
+| **Vel diff threshold (m/s)** | `3.0` | Minimum velocity change in a single frame to arm the jolt. Increase to ignore light taps. |
 | **Frequency** | `40` | Vibration frequency of the jolt. |
 | **Amplitude** | `255` | Vibration strength of the jolt. |
-| **Duration (ms)** | `200` | How long the jolt lasts. |
+| **Duration (ms)** | `150` | How long the jolt lasts. |
+
+#### Body Haptics
+Streams synthesized audio waveforms to the DualSense haptic actuators via the USB audio interface. **Requires USB connection** - not available over Bluetooth. When enabled, Steam body rumble is suppressed so the two systems do not conflict.
+
+| Setting | Default | Description |
+|---|---|---|
+| **Enable body haptics** | `Off` | Master toggle. Enable to activate all body haptic effects below. |
+| **Haptic intensity** | `1.0` | Global multiplier for all body haptic output. |
+| **Engine haptics volume** | `1.0` | Volume of the engine RPM rumble effect. |
+| **Collision haptics volume** | `1.0` | Volume of collision and jerk impact effects. |
+| **Enable slip haptics** | `On` | Rumble from tire slip loss of grip. |
+| **Slip threshold** | `0.8` | Combined slip value above which slip haptics activate. |
+| **Slip intensity** | `1.0` | Strength of the slip rumble. |
+
+---
+
+### Tachometer
+
+Uses the DualSense lightbar as an RPM indicator. Color shifts from green at the start threshold, through yellow, to red at the flash threshold, then flashes red at redline.
+
+| Setting | Default | Description |
+|---|---|---|
+| **Enable tachometer lightbar** | `Off` | Master toggle. |
+| **Start RPM %** | `0.7` | RPM ratio (0.0-0.99) where the lightbar begins lighting up. |
+| **Flash RPM %** | `0.93` | RPM ratio where the lightbar starts flashing red. |
+| **Flash rate Hz** | `10.0` | Flash frequency in Hz. Set to `0` for solid red instead of flashing. |
 
 ---
 
@@ -307,6 +339,8 @@ If the controller shows as connected but the app still shows **DualSense: Waitin
 | **DualSense: Waiting** | Connect via USB. On Linux, install the udev rules (see above). On Windows, close DS4Windows / DualSenseX if running. |
 | **FH6: Waiting for packets** | Confirm Data Out is enabled in-game, the IP matches one shown on the Info tab, and the port is `5300`. Check your firewall allows inbound UDP on port 5300. |
 | **No effects despite receiving** | Check that the trigger mode is not set to **Off** and that intensity is above `0`. |
+| **Body haptics not working** | Body haptics require USB connection - they are not available over Bluetooth. Check the log for "Found DualSense audio endpoint" on startup. If missing, replug via USB. |
+| **Body haptics enabled but no rumble** | Disable in-game controller vibration (see setup step 4). If both are active they conflict and cancel each other out. |
 
 ---
 

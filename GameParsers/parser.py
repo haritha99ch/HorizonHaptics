@@ -88,7 +88,7 @@ class Parser:
         self._prev_accel_z = 0.0
 
     def compute(self, pkt: DataPacket) -> tuple:
-        """Return (L2_frame, R2_frame, r, g, b, motor_l, motor_r, player_leds, l_low, l_high, r_low, r_high)."""
+        """Return (L2_frame, R2_frame, r, g, b, motor_l, motor_r, player_leds, l_low, l_high, r_low, r_high, engine_freq, engine_vol)."""
         self._arm_shift(pkt)
         self._arm_collision(pkt)
         
@@ -164,15 +164,14 @@ class Parser:
             r_low += 0.8
             
         # Surface Rumble (Gravel/Texture): High frequency noise
-        surface_intensity = self.surface.haptic_intensity * 1.5 
-        l_high += (pkt.surface_rumble_fl + pkt.surface_rumble_rl) * 0.5 * surface_intensity
-        r_high += (pkt.surface_rumble_fr + pkt.surface_rumble_rr) * 0.5 * surface_intensity
-        
+        l_high += (pkt.surface_rumble_fl + pkt.surface_rumble_rl) * 0.5 * 1.5
+        r_high += (pkt.surface_rumble_fr + pkt.surface_rumble_rr) * 0.5 * 1.5
+
         # Baseline Asphalt Hum (scales with speed, gentle tire roll)
         # pkt.speed is in m/s. 100 km/h is ~27.7 m/s.
         if pkt.speed > 3.0:
             speed_factor = min(1.0, (pkt.speed - 3.0) / 80.0) # Peaks around 300 km/h
-            asphalt_hum = speed_factor * 0.08 * surface_intensity
+            asphalt_hum = speed_factor * 0.08 * 1.5
             l_high += asphalt_hum
             r_high += asphalt_hum
             
@@ -218,7 +217,8 @@ class Parser:
         throttle_ratio = pkt.accel / 255.0
         engine_vol = (0.08 + (throttle_ratio * 0.25) + (rpm_ratio * 0.1)) * self.surface.engine_haptics_volume
         
-        def _c(val): return max(0.0, min(1.0, val))
+        m = self.surface.haptic_intensity
+        def _c(val): return max(0.0, min(1.0, val * m))
         return _c(l_low), _c(l_high), _c(r_low), _c(r_high), engine_freq, _c(engine_vol)
 
     def _tachometer_color(self, pkt: DataPacket) -> tuple[int, int, int]:

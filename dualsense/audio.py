@@ -1,4 +1,5 @@
 import logging
+import sys
 import threading
 import numpy as np
 
@@ -31,35 +32,43 @@ class AudioHaptics:
         self._phase_high = 0.0
         self._phase_engine = 0.0
         
-        self._low_freq = 65.0   # Bass impacts (65 Hz feels heavy on DualSense)
-        self._high_freq = 180.0 # Gravel texture
-        
+        self._low_freq = 65.0
+        self._high_freq = 180.0
+
+        self._blocksize = 2048
+        self._noise_buf = np.random.uniform(-1.0, 1.0, self._blocksize).astype(np.float32)
+        self._noise_pos = 0
+
         self._find_device()
 
     def _find_device(self):
         if not sd:
             return
-            
+
         try:
-            # We look for WASAPI device with "DualSense" or "Wireless Controller" in the name, having 4 output channels
             hostapis = sd.query_hostapis()
-            wasapi_idx = next((i for i, api in enumerate(hostapis) if api['name'] == 'Windows WASAPI'), None)
-            
-            if wasapi_idx is None:
-                log.error("WASAPI not found, cannot initialize audio haptics.")
-                return
+            if sys.platform.startswith("win"):
+                target_api = next((i for i, a in enumerate(hostapis) if a['name'] == 'Windows WASAPI'), None)
+                if target_api is None:
+                    log.error("WASAPI not found, cannot initialize audio haptics.")
+                    return
+            else:
+                target_api = next((i for i, a in enumerate(hostapis) if 'alsa' in a['name'].lower()), None)
+                if target_api is None:
+                    log.error("ALSA not found, cannot initialize audio haptics.")
+                    return
 
             devices = sd.query_devices()
             for i, dev in enumerate(devices):
-                if dev['hostapi'] == wasapi_idx and dev['max_output_channels'] >= 4:
+                if dev['hostapi'] == target_api and dev['max_output_channels'] >= 4:
                     name = dev['name'].lower()
                     if "dualsense" in name or "wireless controller" in name:
                         self._device_idx = i
                         self.channels = dev['max_output_channels']
-                        log.info(f"Found DualSense Audio Endpoint: {dev['name']} (Device {i})")
+                        log.info("Found DualSense audio endpoint: %s (device %d)", dev['name'], i)
                         return
-                        
-            log.warning("No 4-channel DualSense audio endpoint found. Make sure it's connected via USB.")
+
+            log.warning("No 4-channel DualSense audio endpoint found. Make sure it is connected via USB.")
         except Exception as e:
             log.exception("Error scanning for audio devices: %s", e)
 
@@ -75,8 +84,9 @@ class AudioHaptics:
                 samplerate=self.sample_rate,
                 channels=self.channels,
                 dtype=np.float32,
+                blocksize=self._blocksize,
                 callback=self._audio_callback,
-                latency='low'
+                latency='high'
             )
             self._stream.start()
             log.info("Audio Haptics stream started.")
@@ -123,8 +133,14 @@ class AudioHaptics:
         
         # Base waveforms (range -1.0 to 1.0)
         wave_low = np.sin(2 * np.pi * self._low_freq * t_low)
-        # For gravel, a mix of white noise and a 200Hz tone creates a very realistic crunch
-        noise = np.random.uniform(-1.0, 1.0, size=frames)
+        # Read noise from pre-allocated buffer to avoid per-callback allocation
+        end = self._noise_pos + frames
+        if end <= self._blocksize:
+            noise = self._noise_buf[self._noise_pos:end]
+        else:
+            noise = np.concatenate([self._noise_buf[self._noise_pos:], self._noise_buf[:end - self._blocksize]])
+            np.copyto(self._noise_buf, np.random.uniform(-1.0, 1.0, self._blocksize).astype(np.float32))
+        self._noise_pos = end % self._blocksize
         tone = np.sin(2 * np.pi * 200.0 * t_high)
         wave_high = (noise * 0.7) + (tone * 0.3)
         
