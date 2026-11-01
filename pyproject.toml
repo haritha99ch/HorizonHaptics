@@ -1,12 +1,15 @@
 [project]
 name = "horizonhaptics"
-version = "1.3.0"
+version = "1.3.1"
 description = "HorizonHaptics - Forza Horizon 6 DualSense adaptive triggers"
 license = { file = "LICENSE" }
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.15"
 dependencies = [
     "hidapi>=0.15.0",
     "PySide6>=6.6.0",
     "numpy>=1.26.0",
     "sounddevice>=0.4.6",
 ]
+
+[tool.uv]
+no-build-package = ["cffi"]
