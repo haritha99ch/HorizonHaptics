@@ -11,6 +11,8 @@ Inspired by [cosmii02's RacingDSX](https://github.com/cosmii02/RacingDSX), which
 
 Also inspired by [Hamza Yesilmen's Forza Horizon DualSense project](https://github.com/HamzaYslmn/Forza-Horizon-DualSense-Python), which pioneered adaptive trigger support for Forza on PC. HorizonHaptics is a separate implementation with a different architecture and an expanded feature set targeted at Forza Horizon 6.
 
+Body haptics over Bluetooth use the DualSense HID haptics report reverse-engineered by [egormanga's SAxense](https://github.com/egormanga/SAxense) (MPL-2.0); `dualsense/bt_haptics.py` keeps that license. [awalol's dualsense-bt-haptics](https://github.com/awalol/dualsense-bt-haptics) showed the approach works on Windows.
+
 ---
 
 ## Features
@@ -267,7 +269,7 @@ A sharp burst on both triggers when the car takes a hard impact.
 | **Duration (ms)** | `150` | How long the jolt lasts. |
 
 #### Body Haptics
-Streams synthesized audio waveforms to the DualSense haptic actuators via the USB audio interface. **Requires USB connection** - not available over Bluetooth. When enabled, Steam body rumble is suppressed so the two systems do not conflict.
+Streams synthesized audio waveforms to the DualSense haptic actuators. Over **USB** the waveform goes to the controller's audio endpoint (48 kHz). Over **Bluetooth** it is sent inside HID output report `0x32` (3 kHz, 8-bit stereo, one report every ~10.7 ms); the stream pauses whenever the signal is silent, so it costs no Bluetooth bandwidth while idle. When enabled, Steam body rumble is suppressed so the two systems do not conflict.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -339,7 +341,7 @@ If the controller shows as connected but the app still shows **DualSense: Waitin
 | **DualSense: Waiting** | Connect via USB. On Linux, install the udev rules (see above). On Windows, close DS4Windows / DualSenseX if running. |
 | **FH6: Waiting for packets** | Confirm Data Out is enabled in-game, the IP matches one shown on the Info tab, and the port is `5300`. Check your firewall allows inbound UDP on port 5300. |
 | **No effects despite receiving** | Check that the trigger mode is not set to **Off** and that intensity is above `0`. |
-| **Body haptics not working** | Body haptics require USB connection - they are not available over Bluetooth. Check the log for "Found DualSense audio endpoint" on startup. If missing, replug via USB. |
+| **Body haptics not working** | Check the log on startup: over USB it should show "Found DualSense audio endpoint", over Bluetooth "Bluetooth haptics streamer active". If neither appears, reconnect the controller. |
 | **Body haptics enabled but no rumble** | Disable in-game controller vibration (see setup step 4). If both are active they conflict and cancel each other out. |
 
 ---

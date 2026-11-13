@@ -90,10 +90,35 @@ class DualSense:
         self._connected = False
         self._open_warned = False
         self.allow_steam_rumble = True
+        # Serialises HID writes: the trigger loop and the Bluetooth haptics
+        # streamer (bt_haptics.py) share one handle, and hidapi's Windows
+        # backend is not safe for concurrent writes on the same device.
+        self._io_lock = threading.Lock()
 
     @property
     def connected(self):
         return self._connected
+
+    @property
+    def is_bluetooth(self):
+        return self._connected and self._layout["bt"]
+
+    def _write(self, data):
+        with self._io_lock:
+            return self._dev.write(data)
+
+    def write_raw(self, data):
+        """Write a pre-built HID report (used by the Bluetooth haptics streamer).
+        Returns False if the controller is gone or the write failed."""
+        dev = self._dev
+        if dev is None or not self._connected:
+            return False
+        try:
+            with self._io_lock:
+                return dev.write(data) > 0
+        except Exception as exc:
+            log.debug("Raw HID write failed: %s", exc)
+            return False
 
     def open(self):
         """Start the background I/O thread."""
@@ -156,7 +181,7 @@ class DualSense:
     def _release(self):
         if self._dev:
             try:
-                self._dev.write(self._build(off(), off(), 0, 0, 0, 0, 0, 0))
+                self._write(self._build(off(), off(), 0, 0, 0, 0, 0, 0))
             except Exception:
                 pass
             try:
@@ -171,9 +196,9 @@ class DualSense:
     def _startup_pulse(self):
         """Brief resistance bump on connect so the user knows the controller is live."""
         try:
-            self._dev.write(self._build(rigid(180), rigid(180), 0, 0, 0, 0, 0, 0))
+            self._write(self._build(rigid(180), rigid(180), 0, 0, 0, 0, 0, 0))
             time.sleep(0.18)
-            self._dev.write(self._build(off(), off(), 0, 0, 0, 0, 0, 0))
+            self._write(self._build(off(), off(), 0, 0, 0, 0, 0, 0))
         except Exception:
             pass
 
@@ -209,7 +234,7 @@ class DualSense:
                     motor_l, motor_r = self._pending_motors
                     player_leds = self._pending_player_leds
                     self._dirty = False
-                self._dev.write(self._build(left, right, lb_r, lb_g, lb_b, motor_l, motor_r, player_leds))
+                self._write(self._build(left, right, lb_r, lb_g, lb_b, motor_l, motor_r, player_leds))
             except Exception as exc:
                 log.warning("HID write failed (%s) - reconnecting", exc)
                 self._release()
