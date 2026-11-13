@@ -60,7 +60,7 @@ class Worker:
         self._state = state
         self._port = port
         self._ds = DualSense()
-        self._audio = AudioHaptics()
+        self._audio = AudioHaptics(self._ds)
         # Parser keeps references - not copies - so TUI changes propagate live
         self._parser = Parser(state.throttle, state.brake, state.gear, state.surface, state.tachometer)
         self._thread = threading.Thread(target=self._run, daemon=True, name="hh-worker")
